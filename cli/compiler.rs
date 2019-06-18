@@ -112,6 +112,7 @@ pub fn bundle_async(
     // TODO(ry) Maybe we should use a separate state for the compiler.
     // as was done previously.
     state.clone(),
+    None,
   );
   err_check(worker.execute("denoMain()"));
   err_check(worker.execute("workerMain()"));
@@ -174,6 +175,7 @@ pub fn compile_async(
     // TODO(ry) Maybe we should use a separate state for the compiler.
     // as was done previously.
     state.clone(),
+    None,
   );
   err_check(worker.execute("denoMain()"));
   err_check(worker.execute("workerMain()"));

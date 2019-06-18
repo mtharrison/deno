@@ -5,12 +5,15 @@ mod gn {
 }
 
 fn main() {
+
   let build = gn::Build::setup();
 
   println!(
     "cargo:rustc-link-search=native={}/obj/core/libdeno",
     build.gn_out_dir
   );
+
+  println!("cargo:rerun-if-changed=/Users/matt/Developer/deno/core/libdeno");
 
   build.run("core:deno_core_deps");
 }

@@ -192,6 +192,17 @@ type deno_recv_cb = unsafe extern "C" fn(
   zero_copy_buf: deno_pinned_buf,
 );
 
+#[allow(non_camel_case_types)]
+type deno_inspector_recv_cb = unsafe extern "C" fn(
+  user_data: *mut c_void,
+  message: *mut c_char,
+);
+
+#[allow(non_camel_case_types)]
+type deno_block_cb = unsafe extern "C" fn(
+  user_data: *mut c_void,
+);
+
 /// Called when dynamic import is called in JS: import('foo')
 /// Embedder must call deno_dyn_import() with the specified id and
 /// the module.
@@ -222,6 +233,8 @@ pub struct deno_config<'a> {
   pub load_snapshot: Snapshot2<'a>,
   pub shared: deno_buf,
   pub recv_cb: deno_recv_cb,
+  pub inspector_cb: deno_inspector_recv_cb,
+  pub block_cb: deno_block_cb,
   pub dyn_import_cb: deno_dyn_import_cb,
 }
 
@@ -319,4 +332,11 @@ extern "C" {
 
   #[allow(dead_code)]
   pub fn deno_snapshot_delete(s: &mut deno_snapshot);
+
+  #[allow(dead_code)]
+  pub fn deno_recv_inspector(i: *const isolate, msg: *const c_char);
+
+  #[allow(dead_code)]
+  pub fn deno_setup_inspector(i: *const isolate);
+
 }

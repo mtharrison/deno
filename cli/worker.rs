@@ -2,6 +2,7 @@
 use crate::deno_error::DenoError;
 use crate::state::ThreadSafeState;
 use crate::tokio_util;
+use crate::inspector::Inspector;
 use deno;
 use deno::ModuleSpecifier;
 use deno::StartupData;
@@ -14,7 +15,7 @@ use std::sync::Mutex;
 /// high-level module loading
 #[derive(Clone)]
 pub struct Worker {
-  isolate: Arc<Mutex<deno::Isolate>>,
+  pub isolate: Arc<Mutex<deno::Isolate>>,
   pub state: ThreadSafeState,
 }
 
@@ -23,15 +24,29 @@ impl Worker {
     _name: String,
     startup_data: StartupData,
     state: ThreadSafeState,
+    inspector_handle: Option<deno::InspectorHandle>
   ) -> Worker {
     let state_ = state.clone();
-    let isolate = Arc::new(Mutex::new(deno::Isolate::new(startup_data, false)));
+    let tx = inspector_handle.as_ref().unwrap().tx.clone();
+    let rx2 = inspector_handle.as_ref().unwrap().rx.clone();
+    let isolate = Arc::new(Mutex::new(deno::Isolate::new(startup_data, false, tx, rx2)));
     {
       let mut i = isolate.lock().unwrap();
       i.set_dispatch(move |control_buf, zero_copy_buf| {
         state_.dispatch(control_buf, zero_copy_buf)
       });
     }
+
+    let rx = inspector_handle.as_ref().unwrap().rx.clone();
+    let isolate_clone = isolate.clone();
+
+    std::thread::spawn(move || {
+      loop {
+        let msg = rx.recv().unwrap();
+        isolate_clone.lock().unwrap().send_inspector(msg);
+      }
+    });
+
     Self { isolate, state }
   }
 
@@ -118,9 +133,11 @@ impl Future for Worker {
 
   fn poll(&mut self) -> Result<Async<()>, Self::Error> {
     let mut isolate = self.isolate.lock().unwrap();
-    isolate
+    let res = isolate
       .poll()
-      .map_err(|err| self.apply_source_map(DenoError::from(err)))
+      .map_err(|err| self.apply_source_map(DenoError::from(err)));
+
+    res
   }
 }
 
@@ -152,7 +169,7 @@ mod tests {
     let state_ = state.clone();
     tokio_util::run(lazy(move || {
       let mut worker =
-        Worker::new("TEST".to_string(), StartupData::None, state);
+        Worker::new("TEST".to_string(), StartupData::None, state, None);
       let result = worker.execute_mod(&module_specifier, false);
       if let Err(err) = result {
         eprintln!("execute_mod err {:?}", err);
@@ -180,7 +197,7 @@ mod tests {
     let state_ = state.clone();
     tokio_util::run(lazy(move || {
       let mut worker =
-        Worker::new("TEST".to_string(), StartupData::None, state);
+        Worker::new("TEST".to_string(), StartupData::None, state, None);
       let result = worker.execute_mod(&module_specifier, false);
       if let Err(err) = result {
         eprintln!("execute_mod err {:?}", err);
@@ -209,6 +226,7 @@ mod tests {
         "TEST".to_string(),
         startup_data::deno_isolate_init(),
         state,
+        None,
       );
       err_check(worker.execute("denoMain()"));
       let result = worker.execute_mod(&module_specifier, false);
@@ -230,7 +248,7 @@ mod tests {
       String::from("hello.js"),
     ]);
     let mut worker =
-      Worker::new("TEST".to_string(), startup_data::deno_isolate_init(), state);
+      Worker::new("TEST".to_string(), startup_data::deno_isolate_init(), state, None);
     err_check(worker.execute("denoMain()"));
     err_check(worker.execute("workerMain()"));
     worker

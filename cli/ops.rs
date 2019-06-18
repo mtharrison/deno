@@ -1990,7 +1990,7 @@ fn op_create_worker(
   let name = format!("USER-WORKER-{}", specifier);
 
   let mut worker =
-    Worker::new(name, startup_data::deno_isolate_init(), child_state);
+    Worker::new(name, startup_data::deno_isolate_init(), child_state, None);
   err_check(worker.execute("denoMain()"));
   err_check(worker.execute("workerMain()"));
 

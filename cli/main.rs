@@ -13,6 +13,11 @@ extern crate indexmap;
 #[cfg(unix)]
 extern crate nix;
 extern crate rand;
+extern crate hyper;
+#[macro_use]
+extern crate warp;
+#[macro_use]
+extern crate crossbeam_channel;
 
 mod ansi;
 pub mod compiler;
@@ -27,6 +32,7 @@ mod global_timer;
 mod http_body;
 mod http_util;
 mod import_map;
+mod inspector;
 pub mod msg;
 pub mod msg_util;
 pub mod ops;
@@ -58,6 +64,9 @@ use futures::lazy;
 use futures::Future;
 use log::{LevelFilter, Metadata, Record};
 use std::env;
+
+use inspector::Inspector;
+
 
 static LOGGER: Logger = Logger;
 
@@ -151,6 +160,7 @@ pub fn print_file_info(
 fn create_worker_and_state(
   flags: DenoFlags,
   argv: Vec<String>,
+  inspector_handle: Option<deno::InspectorHandle>,
 ) -> (Worker, ThreadSafeState) {
   let progress = Progress::new();
   progress.set_callback(|done, completed, total, msg| {
@@ -165,11 +175,13 @@ fn create_worker_and_state(
       eprintln!();
     }
   });
+
   let state = ThreadSafeState::new(flags, argv, ops::op_selector_std, progress);
   let worker = Worker::new(
     "main".to_string(),
     startup_data::deno_isolate_init(),
     state.clone(),
+    inspector_handle
   );
 
   (worker, state)
@@ -188,7 +200,7 @@ fn fetch_or_info_command(
   argv: Vec<String>,
   print_info: bool,
 ) {
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+  let (mut worker, state) = create_worker_and_state(flags, argv, None);
 
   let main_module = state.main_module().unwrap();
   let main_future = lazy(move || {
@@ -216,7 +228,7 @@ fn fetch_or_info_command(
 }
 
 fn eval_command(flags: DenoFlags, argv: Vec<String>) {
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+  let (mut worker, state) = create_worker_and_state(flags, argv, None);
   // Wrap provided script in async function so asynchronous methods
   // work. This is required until top-level await is not supported.
   let js_source = format!(
@@ -243,7 +255,7 @@ fn eval_command(flags: DenoFlags, argv: Vec<String>) {
 
 fn xeval_command(flags: DenoFlags, argv: Vec<String>) {
   let xeval_replvar = flags.xeval_replvar.clone().unwrap();
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+  let (mut worker, state) = create_worker_and_state(flags, argv, None);
   let xeval_source = format!(
     "window._xevalWrapper = async function ({}){{
         {}
@@ -265,7 +277,7 @@ fn xeval_command(flags: DenoFlags, argv: Vec<String>) {
 }
 
 fn bundle_command(flags: DenoFlags, argv: Vec<String>) {
-  let (mut _worker, state) = create_worker_and_state(flags, argv);
+  let (mut _worker, state) = create_worker_and_state(flags, argv, None);
 
   let main_module = state.main_module().unwrap();
   assert!(state.argv.len() >= 3);
@@ -284,7 +296,7 @@ fn bundle_command(flags: DenoFlags, argv: Vec<String>) {
 }
 
 fn run_repl(flags: DenoFlags, argv: Vec<String>) {
-  let (mut worker, _state) = create_worker_and_state(flags, argv);
+  let (mut worker, _state) = create_worker_and_state(flags, argv, None);
 
   // REPL situation.
   let main_future = lazy(move || {
@@ -299,8 +311,18 @@ fn run_repl(flags: DenoFlags, argv: Vec<String>) {
   tokio_util::run(main_future);
 }
 
+use std::sync::Arc;
+
 fn run_script(flags: DenoFlags, argv: Vec<String>) {
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+
+  let inspector = inspector::Inspector::new();
+
+  let inspector_handle = deno::InspectorHandle {
+    rx: inspector.inbound_rx.clone(),
+    tx: inspector.outbound_tx.clone(),
+  };
+
+  let (mut worker, state) = create_worker_and_state(flags, argv, Some(inspector_handle));
 
   let main_module = state.main_module().unwrap();
   // Normal situation of executing a module.
@@ -308,6 +330,10 @@ fn run_script(flags: DenoFlags, argv: Vec<String>) {
     // Setup runtime.
     js_check(worker.execute("denoMain()"));
     debug!("main_module {}", main_module);
+
+    // Start inspector server
+
+    tokio::spawn(inspector.serve());
 
     worker
       .execute_mod_async(&main_module, false)

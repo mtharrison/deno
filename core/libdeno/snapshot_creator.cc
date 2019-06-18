@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 
   deno_init();
   deno_config config = {1, deno::empty_snapshot, deno::empty_buf, nullptr,
-                        nullptr};
+                        nullptr, nullptr, nullptr};
   Deno* d = deno_new(config);
 
   deno_execute(d, nullptr, js_fn, js_source.c_str());

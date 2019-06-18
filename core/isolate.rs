@@ -120,6 +120,8 @@ pub struct Isolate {
   pending_dyn_imports: FuturesUnordered<DynImport>,
   have_unpolled_ops: bool,
   startup_script: Option<OwnedScript>,
+  tx: Sender<String>,
+  rx: Receiver<String>,
 }
 
 unsafe impl Send for Isolate {}
@@ -133,12 +135,16 @@ impl Drop for Isolate {
   }
 }
 
+use crossbeam_channel::{Receiver, Sender};
+
 static DENO_INIT: Once = ONCE_INIT;
+// static STATIC_STR: &str = r#"{"id": 0, "method": "Debugger.enable"}"#;
 
 impl Isolate {
+
   /// startup_data defines the snapshot or script used at startup to initalize
   /// the isolate.
-  pub fn new(startup_data: StartupData, will_snapshot: bool) -> Self {
+  pub fn new(startup_data: StartupData, will_snapshot: bool, tx: Sender<String>, rx: Receiver<String>) -> Self {
     DENO_INIT.call_once(|| {
       unsafe { libdeno::deno_init() };
     });
@@ -152,6 +158,8 @@ impl Isolate {
       load_snapshot: Snapshot2::empty(),
       shared: shared.as_deno_buf(),
       recv_cb: Self::pre_dispatch,
+      inspector_cb: Self::inspector_cb,
+      block_cb: Self::block_cb,
       dyn_import_cb: Self::dyn_import,
     };
 
@@ -172,10 +180,11 @@ impl Isolate {
     };
 
     let libdeno_isolate = unsafe { libdeno::deno_new(libdeno_config) };
+    let shared_libdeno_isolate = Arc::new(Mutex::new(Some(libdeno_isolate)));
 
     Self {
       libdeno_isolate,
-      shared_libdeno_isolate: Arc::new(Mutex::new(Some(libdeno_isolate))),
+      shared_libdeno_isolate,
       dispatch: None,
       dyn_import: None,
       shared,
@@ -184,6 +193,15 @@ impl Isolate {
       have_unpolled_ops: false,
       pending_dyn_imports: FuturesUnordered::new(),
       startup_script,
+      tx,
+      rx
+    }
+  }
+
+  pub fn send_inspector(&self, str: String) {
+    unsafe {
+      let cstr = CString::new(str).unwrap();
+      libdeno::deno_recv_inspector(self.libdeno_isolate, cstr.as_ptr());
     }
   }
 
@@ -294,6 +312,27 @@ impl Isolate {
         isolate.have_unpolled_ops = true;
       }
     }
+  }
+
+  extern "C" fn inspector_cb(
+    user_data: *mut c_void,
+    message: *mut c_char,
+  ) {
+    let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
+
+    let c_str = unsafe {
+        assert!(!message.is_null());
+        CStr::from_ptr(message)
+    };
+
+    let r_str = c_str.to_str().unwrap();
+    isolate.tx.send(r_str.to_owned()).unwrap();
+  }
+
+  extern "C" fn block_cb(user_data: *mut c_void,) {
+    let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
+    let msg = isolate.rx.recv().unwrap();
+    isolate.send_inspector(msg);
   }
 
   #[inline]

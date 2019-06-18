@@ -3,6 +3,8 @@
 extern crate log;
 extern crate futures;
 extern crate libc;
+#[macro_use]
+extern crate crossbeam_channel;
 
 mod flags;
 mod isolate;
@@ -19,6 +21,14 @@ pub use crate::libdeno::deno_mod;
 pub use crate::libdeno::PinnedBuf;
 pub use crate::module_specifier::ModuleSpecifier;
 pub use crate::modules::*;
+
+use std::sync::Arc;
+use crossbeam_channel::{Receiver, Sender};
+
+pub struct InspectorHandle {
+  pub rx: Receiver<String>,
+  pub tx: Sender<String>,
+}
 
 pub fn v8_version() -> &'static str {
   use std::ffi::CStr;

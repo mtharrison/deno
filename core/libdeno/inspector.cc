@@ -57,6 +57,11 @@ InspectorClient::InspectorClient(Local<Context> context, deno::DenoIsolate* deno
   channel_.reset(fe);
   inspector_ = v8_inspector::V8Inspector::create(isolate_, this);
   session_ = inspector_->connect(1, channel_.get(), v8_inspector::StringView());
+
+  // TODO: MAke sure comms can happen
+
+  session_->schedulePauseOnNextStatement(v8_inspector::StringView(), v8_inspector::StringView());
+
   context->SetAlignedPointerInEmbedderData(kInspectorClientIndex, this);
   inspector_->contextCreated(v8_inspector::V8ContextInfo(
       context, kContextGroupId, v8_inspector::StringView()));

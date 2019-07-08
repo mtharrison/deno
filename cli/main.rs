@@ -327,17 +327,29 @@ fn run_script(flags: DenoFlags, argv: Vec<String>) {
   let main_module = state.main_module().unwrap();
   // Normal situation of executing a module.
   let main_future = lazy(move || {
-    // Setup runtime.
-    js_check(worker.execute("denoMain()"));
-    debug!("main_module {}", main_module);
 
     // Start inspector server
 
     tokio::spawn(inspector.serve());
 
+    // Block on a connection
+
+    println!("About to block on a connection");
+
+    // Setup runtime.
+    println!("About to execute denoMain()");
+    js_check(worker.execute("denoMain()"));
+
+    inspector.ready_rx.recv().unwrap();
+
+    println!("Out of deno main()");
+    debug!("main_module {}", main_module);
+
+    println!("About to execute main module()");
     worker
       .execute_mod_async(&main_module, false)
       .and_then(move |()| {
+        println!("Out of main module");
         worker.then(|result| {
           js_check(result);
           Ok(())

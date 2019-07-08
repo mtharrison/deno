@@ -25,6 +25,8 @@ pub struct Inspector {
   pub inbound_rx: Receiver<String>,
   pub outbound_tx: Sender<String>,
   outbound_rx: Receiver<String>,
+  ready_tx: Sender<()>,
+  pub ready_rx: Receiver<()>,
 }
 
 impl Inspector {
@@ -32,12 +34,15 @@ impl Inspector {
 
     let (inbound_tx, inbound_rx) = unbounded::<String>();
     let (outbound_tx, outbound_rx) = unbounded::<String>();
+    let (ready_tx, ready_rx) = unbounded::<()>();
 
     Inspector {
       inbound_tx,
       inbound_rx,
       outbound_tx,
       outbound_rx,
+      ready_rx,
+      ready_tx,
     }
   }
 
@@ -45,6 +50,7 @@ impl Inspector {
 
     let inbound_tx = self.inbound_tx.clone();
     let outbound_rx = self.outbound_rx.clone();
+    let ready_tx = self.ready_tx.clone();
 
     let websocket = warp::path("websocket")
       .and(warp::ws2())
@@ -52,8 +58,16 @@ impl Inspector {
 
           let sender = inbound_tx.clone();
           let receiver = outbound_rx.clone();
+          let ready_tx = ready_tx.clone();
 
-          ws.on_upgrade(move |socket| on_connection(socket, sender, receiver))
+          ws.on_upgrade(move |socket| {
+
+            std::thread::spawn(move || {
+              std::thread::sleep(std::time::Duration::from_secs(5));
+              ready_tx.send(()).unwrap();
+            });
+            on_connection(socket, sender, receiver)
+          })
       });
 
     let json = warp::path("json").map(|| warp::reply::html(JSON));

@@ -44,7 +44,7 @@ void InspectorFrontend::Send(const v8_inspector::StringView& string) {
 
   char *cstr = &str[0u];
 
-  // printf("V8->RUST: %s\n", cstr);
+  printf("V8->RUST: %s\n", cstr);
   deno_->inspector_cb_(deno_->hack_, cstr);
 }
 
@@ -60,7 +60,7 @@ InspectorClient::InspectorClient(Local<Context> context, deno::DenoIsolate* deno
 
   // TODO: MAke sure comms can happen
 
-  session_->schedulePauseOnNextStatement(v8_inspector::StringView(), v8_inspector::StringView());
+  printf("Scheduling pause on next statement\n");
 
   context->SetAlignedPointerInEmbedderData(kInspectorClientIndex, this);
   inspector_->contextCreated(v8_inspector::V8ContextInfo(

@@ -144,6 +144,11 @@ void deno_mod_evaluate(Deno* d_, void* user_data, deno_mod id) {
 
   CHECK_EQ(Module::kInstantiated, module->GetStatus());
 
+  v8_inspector::V8InspectorSession* session = v8::InspectorClient::GetSession(context);
+  const uint8_t* reason = (uint8_t*) "Break on start";
+  v8_inspector::StringView strview(reason, 14);
+  session->schedulePauseOnNextStatement(strview, strview);
+
   auto maybe_result = module->Evaluate(context);
   if (maybe_result.IsEmpty()) {
     CHECK_EQ(Module::kErrored, module->GetStatus());

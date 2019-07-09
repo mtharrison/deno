@@ -44,7 +44,7 @@ void InspectorFrontend::Send(const v8_inspector::StringView& string) {
 
   char *cstr = &str[0u];
 
-  printf("V8->RUST: %s\n", cstr);
+  // printf("V8->RUST: %s\n", cstr);
   deno_->inspector_cb_(deno_->hack_, cstr);
 }
 

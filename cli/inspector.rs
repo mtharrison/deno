@@ -99,7 +99,7 @@ fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<Strin
   let fut_rx = user_ws_rx
       .for_each(move |msg| {
           let msg_str = msg.to_str().unwrap();
-          // println!("FE->RUST: {}", msg_str);
+          println!("FE->RUST: {}", msg_str);
           sender.send(msg_str.to_owned()).unwrap_or_else(|err| println!("Err: {}", err));
 
           Ok(())
@@ -109,7 +109,7 @@ fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<Strin
   std::thread::spawn(move || {
     loop {
       let msg = receiver.recv().unwrap();
-      // println!("RUST->FE: {}", msg);
+      println!("RUST->FE: {}", msg);
       user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
     }
   });

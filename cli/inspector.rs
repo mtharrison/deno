@@ -26,7 +26,7 @@ pub struct Inspector {
   pub outbound_tx: Sender<String>,
   outbound_rx: Receiver<String>,
   ready_tx: Sender<()>,
-  pub ready_rx: Receiver<()>,
+  ready_rx: Receiver<()>,
 }
 
 impl Inspector {
@@ -44,6 +44,19 @@ impl Inspector {
       ready_rx,
       ready_tx,
     }
+  }
+
+  pub fn start(&mut self, wait: bool) {
+
+    tokio::spawn(self.serve());
+
+    println!("Inspector listening on http://localhost:8595 ... blah");
+
+    if wait {
+      self.ready_rx.recv().unwrap();
+    }
+
+    println!("Inspector client attached...");
   }
 
   pub fn serve(&self) -> impl Future<Item = (), Error = ()> {

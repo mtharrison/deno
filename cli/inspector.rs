@@ -75,10 +75,7 @@ impl Inspector {
 
           ws.on_upgrade(move |socket| {
 
-            std::thread::spawn(move || {
-              std::thread::sleep(std::time::Duration::from_secs(5));
-              ready_tx.send(()).unwrap();
-            });
+            ready_tx.send(()).unwrap();
             on_connection(socket, sender, receiver)
           })
       });

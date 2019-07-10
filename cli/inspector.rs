@@ -6,6 +6,8 @@ use warp::ws::WebSocket;
 use warp::Filter;
 use warp::ws::Message;
 
+static UUID: &str = "9999-622c-48ac-afec-0974f0f1d378";
+
 static JSON: &str = r#"[ {
   "description": "deno instance",
   "devtoolsFrontendUrl": "chrome-devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=127.0.0.1:9229/websocket",
@@ -21,12 +23,15 @@ static JSON: &str = r#"[ {
 static VERSION: &str = "{ \"Browser\": \"node.js/v10.15.3\", \"Protocol-Version\": \"1.1\", \"webSocketDebuggerUrl\": \"ws://127.0.0.1:3012/9999-622c-48ac-afec-0974f0f1d378\" }";
 
 pub struct Inspector {
+  // sharable handle to channels passed to isolate
+  pub handle: deno::InspectorHandle,
+  // sending/receving messages from isolate
   inbound_tx: Sender<String>,
-  pub inbound_rx: Receiver<String>,
-  pub outbound_tx: Sender<String>,
   outbound_rx: Receiver<String>,
+  // signals readiness of inspector
   ready_tx: Sender<()>,
   ready_rx: Receiver<()>,
+
 }
 
 impl Inspector {
@@ -37,9 +42,8 @@ impl Inspector {
     let (ready_tx, ready_rx) = unbounded::<()>();
 
     Inspector {
+      handle: deno::InspectorHandle::new(outbound_tx, inbound_rx),
       inbound_tx,
-      inbound_rx,
-      outbound_tx,
       outbound_rx,
       ready_rx,
       ready_tx,
@@ -48,15 +52,15 @@ impl Inspector {
 
   pub fn start(&mut self, wait: bool) {
 
-    tokio::spawn(self.serve());
+    tokio::spawn(self.serve()); // start server
 
-    println!("Inspector listening on http://localhost:8595 ... blah");
+    println!("Debugger listening on ws://127.0.0.1:9229/{}", UUID);
 
     if wait {
       self.ready_rx.recv().unwrap();
     }
 
-    println!("Inspector client attached...");
+    println!("Inspector frontend connected.");
   }
 
   pub fn serve(&self) -> impl Future<Item = (), Error = ()> {
@@ -95,7 +99,7 @@ fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<Strin
   let fut_rx = user_ws_rx
       .for_each(move |msg| {
           let msg_str = msg.to_str().unwrap();
-          println!("FE->RUST: {}", msg_str);
+          // println!("FE->RUST: {}", msg_str);
           sender.send(msg_str.to_owned()).unwrap_or_else(|err| println!("Err: {}", err));
 
           Ok(())
@@ -105,7 +109,7 @@ fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<Strin
   std::thread::spawn(move || {
     loop {
       let msg = receiver.recv().unwrap();
-      println!("RUST->FE: {}", msg);
+      // println!("RUST->FE: {}", msg);
       let _ = ready_tx.send(());
       user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
     }

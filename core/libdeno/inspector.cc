@@ -60,7 +60,7 @@ InspectorClient::InspectorClient(Local<Context> context, deno::DenoIsolate* deno
 
   // TODO: MAke sure comms can happen
 
-  printf("Scheduling pause on next statement\n");
+  // printf("Scheduling pause on next statement\n");
 
   context->SetAlignedPointerInEmbedderData(kInspectorClientIndex, this);
   inspector_->contextCreated(v8_inspector::V8ContextInfo(
@@ -71,11 +71,11 @@ InspectorClient::InspectorClient(Local<Context> context, deno::DenoIsolate* deno
 
 void InspectorClient::runMessageLoopOnPause(int context_group_id)  {
     terminated_ = false;
-    printf("Entered loop\n");
+    // printf("Entered loop\n");
     while (!terminated_) {
       deno_->block_cb_(deno_->hack_);
     }
-    printf("Exited loop\n");
+    // printf("Exited loop\n");
   }
 
 v8_inspector::V8InspectorSession* InspectorClient::GetSession(

@@ -16,7 +16,6 @@ extern crate rand;
 extern crate hyper;
 #[macro_use]
 extern crate warp;
-#[macro_use]
 extern crate crossbeam_channel;
 
 mod ansi;
@@ -178,16 +177,11 @@ fn create_worker_and_state(
 
   let inspector = Inspector::new();
 
-  let inspector_handle = deno::InspectorHandle {
-    rx: inspector.inbound_rx.clone(),
-    tx: inspector.outbound_tx.clone(),
-  };
-
   let worker = Worker::new(
     "main".to_string(),
     startup_data::deno_isolate_init(),
     state.clone(),
-    Some(inspector_handle)
+    Some(inspector.handle.clone())
   );
 
   (worker, state, inspector)

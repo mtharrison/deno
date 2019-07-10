@@ -2,7 +2,6 @@
 use crate::deno_error::DenoError;
 use crate::state::ThreadSafeState;
 use crate::tokio_util;
-use crate::inspector::Inspector;
 use deno;
 use deno::ModuleSpecifier;
 use deno::StartupData;
@@ -27,9 +26,7 @@ impl Worker {
     inspector_handle: Option<deno::InspectorHandle>
   ) -> Worker {
     let state_ = state.clone();
-    let tx = inspector_handle.as_ref().unwrap().tx.clone();
-    let rx2 = inspector_handle.as_ref().unwrap().rx.clone();
-    let isolate = Arc::new(Mutex::new(deno::Isolate::new(startup_data, false, tx, rx2)));
+    let isolate = Arc::new(Mutex::new(deno::Isolate::new(startup_data, false, inspector_handle.clone())));
     {
       let mut i = isolate.lock().unwrap();
       i.set_dispatch(move |control_buf, zero_copy_buf| {
@@ -37,15 +34,17 @@ impl Worker {
       });
     }
 
-    let rx = inspector_handle.as_ref().unwrap().rx.clone();
-    let isolate_clone = isolate.clone();
+    if let Some(handle) = inspector_handle {
+      let isolate_clone = isolate.clone();
+      let rx = handle.rx.clone();
 
-    std::thread::spawn(move || {
-      loop {
-        let msg = rx.recv().unwrap();
-        isolate_clone.lock().unwrap().send_inspector(msg);
-      }
-    });
+      std::thread::spawn(move || {
+        loop {
+          let msg = rx.recv().unwrap();
+          isolate_clone.lock().unwrap().send_inspector(msg);
+        }
+      });
+    }
 
     Self { isolate, state }
   }

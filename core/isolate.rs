@@ -13,6 +13,7 @@ use crate::libdeno::deno_pinned_buf;
 use crate::libdeno::PinnedBuf;
 use crate::libdeno::Snapshot1;
 use crate::libdeno::Snapshot2;
+use crate::InspectorHandle;
 use crate::shared_queue::SharedQueue;
 use crate::shared_queue::RECOMMENDED_SIZE;
 use futures::stream::{FuturesUnordered, Stream};
@@ -120,8 +121,7 @@ pub struct Isolate {
   pending_dyn_imports: FuturesUnordered<DynImport>,
   have_unpolled_ops: bool,
   startup_script: Option<OwnedScript>,
-  tx: Sender<String>,
-  rx: Receiver<String>,
+  inspector_handle: Option<InspectorHandle>,
 }
 
 unsafe impl Send for Isolate {}
@@ -135,8 +135,6 @@ impl Drop for Isolate {
   }
 }
 
-use crossbeam_channel::{Receiver, Sender};
-
 static DENO_INIT: Once = ONCE_INIT;
 // static STATIC_STR: &str = r#"{"id": 0, "method": "Debugger.enable"}"#;
 
@@ -144,7 +142,7 @@ impl Isolate {
 
   /// startup_data defines the snapshot or script used at startup to initalize
   /// the isolate.
-  pub fn new(startup_data: StartupData, will_snapshot: bool, tx: Sender<String>, rx: Receiver<String>) -> Self {
+  pub fn new(startup_data: StartupData, will_snapshot: bool, inspector_handle: Option<InspectorHandle>) -> Self {
     DENO_INIT.call_once(|| {
       unsafe { libdeno::deno_init() };
     });
@@ -193,8 +191,7 @@ impl Isolate {
       have_unpolled_ops: false,
       pending_dyn_imports: FuturesUnordered::new(),
       startup_script,
-      tx,
-      rx
+      inspector_handle,
     }
   }
 
@@ -326,13 +323,18 @@ impl Isolate {
     };
 
     let r_str = c_str.to_str().unwrap();
-    isolate.tx.send(r_str.to_owned()).unwrap();
+
+    if let Some(handle) = &isolate.inspector_handle {
+      handle.tx.send(r_str.to_owned()).unwrap();
+    }
   }
 
   extern "C" fn block_cb(user_data: *mut c_void,) {
     let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
-    let msg = isolate.rx.recv().unwrap();
-    isolate.send_inspector(msg);
+    if let Some(handle) = &isolate.inspector_handle {
+      let msg = handle.rx.recv().unwrap();
+      isolate.send_inspector(msg);
+    }
   }
 
   #[inline]

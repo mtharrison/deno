@@ -73,7 +73,7 @@ void InspectorClient::runMessageLoopOnPause(int context_group_id)  {
     terminated_ = false;
     // printf("Entered loop\n");
     while (!terminated_) {
-      deno_->block_cb_(deno_->hack_);
+      deno_->block_cb_(deno_->user_data_);
     }
     // printf("Exited loop\n");
   }

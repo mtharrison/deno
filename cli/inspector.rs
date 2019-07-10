@@ -73,11 +73,7 @@ impl Inspector {
           let receiver = outbound_rx.clone();
           let ready_tx = ready_tx.clone();
 
-          ws.on_upgrade(move |socket| {
-
-            ready_tx.send(()).unwrap();
-            on_connection(socket, sender, receiver)
-          })
+          ws.on_upgrade(move |socket| on_connection(socket, sender, receiver, ready_tx))
       });
 
     let json = warp::path("json").map(|| warp::reply::html(JSON));
@@ -92,7 +88,7 @@ impl Inspector {
   }
 }
 
-fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<String>) -> impl Future<Item = (), Error = ()> {
+fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<String>, ready_tx: Sender<()>) -> impl Future<Item = (), Error = ()> {
 
   let (mut user_ws_tx, user_ws_rx) = ws.split();
 
@@ -110,6 +106,7 @@ fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<Strin
     loop {
       let msg = receiver.recv().unwrap();
       println!("RUST->FE: {}", msg);
+      let _ = ready_tx.send(());
       user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
     }
   });

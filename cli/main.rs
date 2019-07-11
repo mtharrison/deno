@@ -7,6 +7,8 @@ extern crate log;
 extern crate futures;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 extern crate clap;
 extern crate deno;
 extern crate indexmap;

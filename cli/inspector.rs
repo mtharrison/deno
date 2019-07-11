@@ -13,7 +13,7 @@ static UUID: &str = "9999-622c-48ac-afec-0974f0f1d378";
 
 lazy_static! {
     #[derive(Serialize)]
-    pub static ref RESPONSE_JSON: Value = json!({
+    pub static ref RESPONSE_JSON: Value = json!([{
       "description": "deno",
       "devtoolsFrontendUrl": "chrome-devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=127.0.0.1:9229/websocket",
       "devtoolsFrontendUrlCompat": "chrome-devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/websocket",
@@ -23,11 +23,11 @@ lazy_static! {
       "type": "deno",
       "url": "file://",
       "webSocketDebuggerUrl": "ws://127.0.0.1:9229/websocket"
-    });
+    }]);
 
     #[derive(Serialize)]
     pub static ref RESPONSE_VERSION: Value = json!({
-      "Browser": format!("Deno{}", DENO),
+      "Browser": format!("Deno/{}", DENO),
       "Protocol-Version": "1.1",
       "webSocketDebuggerUrl": format!("ws://127.0.0.1:3012/{}", UUID)
     });

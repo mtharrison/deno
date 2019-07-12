@@ -1,11 +1,13 @@
 use futures::{Future, Stream};
 use futures::Sink;
+use futures::sync::oneshot::{SpawnHandle, spawn};
 use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
 use warp::ws::WebSocket;
 use warp::Filter;
 use warp::ws::Message;
 use serde_json::Value;
+use std::sync::{Arc, Mutex};
 
 use crate::version::DENO;
 
@@ -42,7 +44,8 @@ pub struct Inspector {
   // signals readiness of inspector
   ready_tx: Sender<()>,
   ready_rx: Receiver<()>,
-
+  server_spawn_handle: Option<SpawnHandle<(), ()>>,
+  connected: Arc<Mutex<bool>>,
 }
 
 impl Inspector {
@@ -58,20 +61,21 @@ impl Inspector {
       outbound_rx,
       ready_rx,
       ready_tx,
+      server_spawn_handle: None,
+      connected: Arc::new(Mutex::new(false)),
     }
   }
 
   pub fn start(&mut self, wait: bool) {
 
-    tokio::spawn(self.serve()); // start server
+    self.server_spawn_handle = Some(spawn(self.serve(), &tokio_executor::DefaultExecutor::current()));
 
     println!("Debugger listening on ws://127.0.0.1:9229/{}", UUID);
 
     if wait {
-      self.ready_rx.recv().unwrap();
+      self.ready_rx.recv().expect("Error waiting for inspector server to start.");
+      println!("Inspector frontend connected.");
     }
-
-    println!("Inspector frontend connected.");
   }
 
   pub fn serve(&self) -> impl Future<Item = (), Error = ()> {
@@ -79,6 +83,7 @@ impl Inspector {
     let inbound_tx = self.inbound_tx.clone();
     let outbound_rx = self.outbound_rx.clone();
     let ready_tx = self.ready_tx.clone();
+    let connected = self.connected.clone();
 
     let websocket = warp::path("websocket")
       .and(warp::ws2())
@@ -87,31 +92,30 @@ impl Inspector {
           let sender = inbound_tx.clone();
           let receiver = outbound_rx.clone();
           let ready_tx = ready_tx.clone();
+          let connected = connected.clone();
 
-          ws.on_upgrade(move |socket| on_connection(socket, sender, receiver, ready_tx))
+          ws.on_upgrade(move |socket| on_connection(socket, sender, receiver, ready_tx, connected))
       });
 
-    let json = warp::path("json")
-      .map(|| {
+    let json = warp::path("json").map(|| warp::reply::json(&*RESPONSE_JSON));
 
-        warp::reply::json(&*RESPONSE_JSON)
-      });
+    let version = path!("json" / "version").map(|| warp::reply::json(&*RESPONSE_VERSION));
 
-    let version = path!("json" / "version")
-      .map(|| {
-
-        warp::reply::json(&*RESPONSE_VERSION)
-      });
-
-    let routes = websocket
-      .or(version)
-      .or(json);
+    let routes = websocket.or(version).or(json);
 
     warp::serve(routes).bind(([127, 0, 0, 1], 9229))
   }
+
+  pub fn stop(&mut self) {}
 }
 
-fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<String>, ready_tx: Sender<()>) -> impl Future<Item = (), Error = ()> {
+fn on_connection(
+  ws: WebSocket,
+  sender: Sender<String>,
+  receiver: Receiver<String>,
+  ready_tx: Sender<()>,
+  connected: Arc<Mutex<bool>>,
+) -> impl Future<Item = (), Error = ()> {
 
   let (mut user_ws_tx, user_ws_rx) = ws.split();
 
@@ -127,12 +131,22 @@ fn on_connection(ws: WebSocket, sender: Sender<String>, receiver: Receiver<Strin
 
   std::thread::spawn(move || {
     loop {
-      let msg = receiver.recv().unwrap();
-      // println!("RUST->FE: {}", msg);
-      let _ = ready_tx.send(());
-      user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
+      let received = receiver.recv();
+      if let Ok(msg) = received {
+        let _ = ready_tx.send(());
+        *connected.lock().unwrap() = true;
+        user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
+      }
     }
   });
 
   fut_rx
+}
+
+impl Drop for Inspector {
+  fn drop(&mut self) {
+    if *self.connected.lock().unwrap() == true {
+      println!("Waiting for debugger to disconnect...");
+    }
+  }
 }

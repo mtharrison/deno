@@ -328,8 +328,11 @@ fn run_script(flags: DenoFlags, argv: Vec<String>) {
     worker
       .execute_mod_async(&main_module, false)
       .and_then(move |()| {
-        worker.then(|result| {
+        worker.then(move |result| {
           js_check(result);
+
+          inspector.stop();
+
           Ok(())
         })
       }).map_err(print_err_and_exit)

@@ -40,8 +40,9 @@ impl Worker {
 
       std::thread::spawn(move || {
         loop {
-          let msg = rx.recv().unwrap();
-          isolate_clone.lock().unwrap().send_inspector(msg);
+          if let Ok(msg) = rx.recv() {
+            isolate_clone.lock().unwrap().send_inspector(msg);
+          }
         }
       });
     }

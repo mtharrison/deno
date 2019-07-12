@@ -33,6 +33,8 @@ pub struct DenoFlags {
   pub v8_flags: Option<Vec<String>>,
   pub xeval_replvar: Option<String>,
   pub xeval_delim: Option<String>,
+  pub inspector_enable: bool,
+  pub inspector_pause_on_start: bool,
 }
 
 static ENV_VARIABLES_HELP: &str = "ENVIRONMENT VARIABLES:
@@ -57,6 +59,14 @@ fn add_run_args<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
         .use_delimiter(true)
         .require_equals(true)
         .help("Allow file system write access"),
+    ).arg(
+      Arg::with_name("inspect")
+        .long("inspect")
+        .help("Enable inspector"),
+    ).arg(
+      Arg::with_name("inspect-brk")
+        .long("inspect-brk")
+        .help("Enable inspector and pause on first statement"),
     ).arg(
       Arg::with_name("allow-net")
         .long("allow-net")
@@ -395,6 +405,13 @@ fn resolve_paths(paths: Vec<String>) -> Vec<String> {
 pub fn parse_flags(matches: &ArgMatches) -> DenoFlags {
   let mut flags = DenoFlags::default();
 
+  if matches.is_present("inspect") {
+    flags.inspector_enable = true;
+  }
+  if matches.is_present("inspect-brk") {
+    flags.inspector_pause_on_start = true;
+    flags.inspector_enable = true;
+  }
   if matches.is_present("log-debug") {
     flags.log_debug = true;
   }

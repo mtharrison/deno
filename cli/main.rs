@@ -315,6 +315,9 @@ fn run_repl(flags: DenoFlags, argv: Vec<String>) {
 
 fn run_script(flags: DenoFlags, argv: Vec<String>) {
 
+  let inspector_enable = flags.inspector_enable;
+  let inspector_pause = flags.inspector_pause_on_start;
+
   let (mut worker, state, mut inspector) = create_worker_and_state(flags, argv);
 
   let main_module = state.main_module().unwrap();
@@ -322,7 +325,9 @@ fn run_script(flags: DenoFlags, argv: Vec<String>) {
   let main_future = lazy(move || {
     js_check(worker.execute("denoMain()"));
 
-    inspector.start(true);
+    if inspector_enable {
+      inspector.start(inspector_pause);
+    }
 
     debug!("main_module {}", main_module);
     worker
@@ -331,7 +336,9 @@ fn run_script(flags: DenoFlags, argv: Vec<String>) {
         worker.then(move |result| {
           js_check(result);
 
-          inspector.stop();
+          if inspector_enable {
+            inspector.stop();
+          }
 
           Ok(())
         })

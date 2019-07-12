@@ -12,26 +12,28 @@ use std::sync::{Arc, Mutex};
 use crate::version::DENO;
 
 static UUID: &str = "9999-622c-48ac-afec-0974f0f1d378";
+static HOST: &str = "127.0.0.1";
+static PORT: &str = "9888";
 
 lazy_static! {
     #[derive(Serialize)]
     pub static ref RESPONSE_JSON: Value = json!([{
       "description": "deno",
-      "devtoolsFrontendUrl": "chrome-devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=127.0.0.1:9229/websocket",
-      "devtoolsFrontendUrlCompat": "chrome-devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/websocket",
+      "devtoolsFrontendUrl": format!("chrome-devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws={}:{}/websocket", HOST, PORT),
+      "devtoolsFrontendUrlCompat": format!("chrome-devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws={}:{}/websocket", HOST, PORT),
       "faviconUrl": "https://www.deno-play.app/images/deno.svg",
       "id": UUID,
       "title": format!("deno[{}]", std::process::id()),
       "type": "deno",
       "url": "file://",
-      "webSocketDebuggerUrl": "ws://127.0.0.1:9229/websocket"
+      "webSocketDebuggerUrl": format!("ws://{}:{}/websocket", HOST, PORT)
     }]);
 
     #[derive(Serialize)]
     pub static ref RESPONSE_VERSION: Value = json!({
       "Browser": format!("Deno/{}", DENO),
       "Protocol-Version": "1.1",
-      "webSocketDebuggerUrl": format!("ws://127.0.0.1:3012/{}", UUID)
+      "webSocketDebuggerUrl": format!("ws://{}:{}/{}", HOST, PORT, UUID)
     });
 }
 
@@ -66,18 +68,6 @@ impl Inspector {
     }
   }
 
-  pub fn start(&mut self, wait: bool) {
-
-    self.server_spawn_handle = Some(spawn(self.serve(), &tokio_executor::DefaultExecutor::current()));
-
-    println!("Debugger listening on ws://127.0.0.1:9229/{}", UUID);
-
-    if wait {
-      self.ready_rx.recv().expect("Error waiting for inspector server to start.");
-      println!("Inspector frontend connected.");
-    }
-  }
-
   pub fn serve(&self) -> impl Future<Item = (), Error = ()> {
 
     let inbound_tx = self.inbound_tx.clone();
@@ -103,7 +93,22 @@ impl Inspector {
 
     let routes = websocket.or(version).or(json);
 
-    warp::serve(routes).bind(([127, 0, 0, 1], 9229))
+    let endpoint = format!("{}:{}", HOST, PORT);
+    let addr = endpoint.parse::<std::net::SocketAddrV4>().unwrap();
+
+    warp::serve(routes).bind(addr)
+  }
+
+  pub fn start(&mut self, wait: bool) {
+
+    self.server_spawn_handle = Some(spawn(self.serve(), &tokio_executor::DefaultExecutor::current()));
+
+    println!("Debugger listening on ws://{}:{}/{}", HOST, PORT, UUID);
+
+    if wait {
+      self.ready_rx.recv().expect("Error waiting for inspector server to start.");
+      println!("Inspector frontend connected.");
+    }
   }
 
   pub fn stop(&mut self) {}

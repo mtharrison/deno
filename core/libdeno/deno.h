@@ -41,6 +41,11 @@ typedef int deno_dyn_import_id;
 typedef void (*deno_dyn_import_cb)(void* user_data, const char* specifier,
                                    const char* referrer, deno_dyn_import_id id);
 
+// A callback to Rust with a message from the v8 inspector
+typedef void (*deno_inspector_message_cb)(void* user_data, char* message);
+
+typedef void (*deno_inspector_block_recv)(void* user_data);
+
 void deno_init();
 const char* deno_v8_version();
 void deno_set_v8_flags(int* argc, char** argv);
@@ -51,6 +56,8 @@ typedef struct {
   deno_buf shared;              // Shared buffer to be mapped to libdeno.shared
   deno_recv_cb recv_cb;         // Maps to libdeno.send() calls.
   deno_dyn_import_cb dyn_import_cb;
+  deno_inspector_message_cb inspector_message_cb;
+  deno_inspector_block_recv inspector_block_recv;
 } deno_config;
 
 // Create a new deno isolate.
@@ -133,6 +140,8 @@ void deno_mod_evaluate(Deno* d, void* user_data, deno_mod id);
 // those arising from ops in Deno.
 void deno_dyn_import_done(Deno* d, void* user_data, deno_dyn_import_id id,
                           deno_mod mod_id, const char* error_str);
+
+void deno_inspector_message(Deno* d, char* message);
 
 #ifdef __cplusplus
 }  // extern "C"

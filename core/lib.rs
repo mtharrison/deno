@@ -1,4 +1,5 @@
 // Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
+extern crate crossbeam_channel;
 #[macro_use]
 extern crate log;
 extern crate futures;
@@ -21,12 +22,27 @@ pub use crate::libdeno::deno_mod;
 pub use crate::libdeno::PinnedBuf;
 pub use crate::module_specifier::*;
 pub use crate::modules::*;
+use crossbeam_channel::{Receiver, Sender};
 
 pub fn v8_version() -> &'static str {
   use std::ffi::CStr;
   let version = unsafe { libdeno::deno_v8_version() };
   let c_str = unsafe { CStr::from_ptr(version) };
   c_str.to_str().unwrap()
+}
+
+// todo(matt): Move these somewhere else
+
+#[derive(Clone)]
+pub struct InspectorHandle {
+  pub tx: Sender<String>,
+  pub rx: Receiver<String>,
+}
+
+ impl InspectorHandle {
+  pub fn new(tx: Sender<String>, rx: Receiver<String>) -> InspectorHandle {
+    InspectorHandle { tx, rx }
+  }
 }
 
 #[test]

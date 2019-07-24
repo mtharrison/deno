@@ -29,6 +29,7 @@ mod global_timer;
 mod http_body;
 mod http_util;
 mod import_map;
+mod inspector;
 pub mod msg;
 pub mod msg_util;
 pub mod ops;
@@ -48,6 +49,8 @@ pub mod version;
 pub mod worker;
 
 use crate::deno_dir::SourceFileFetcher;
+use crate::compiler::bundle_async;
+use crate::inspector::Inspector;
 use crate::progress::Progress;
 use crate::state::ThreadSafeState;
 use crate::worker::Worker;
@@ -179,7 +182,7 @@ pub fn print_file_info(
 fn create_worker_and_state(
   flags: DenoFlags,
   argv: Vec<String>,
-) -> (Worker, ThreadSafeState) {
+) -> (Worker, ThreadSafeState, Inspector) {
   use crate::shell::Shell;
   use std::sync::Arc;
   use std::sync::Mutex;
@@ -192,13 +195,16 @@ fn create_worker_and_state(
     }
   });
   let state = ThreadSafeState::new(flags, argv, ops::op_selector_std, progress);
+  // todo(matt): Maybe worker should own Inspector instead?
+  let inspector = Inspector::new();
   let worker = Worker::new(
     "main".to_string(),
     startup_data::deno_isolate_init(),
     state.clone(),
+    Some(inspector.handle.clone()),
   );
 
-  (worker, state)
+  (worker, state, inspector)
 }
 
 fn types_command() {
@@ -214,7 +220,7 @@ fn fetch_or_info_command(
   argv: Vec<String>,
   print_info: bool,
 ) {
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+  let (mut worker, state, _inspector) = create_worker_and_state(flags, argv);
 
   let main_module = state.main_module().unwrap();
   let main_future = lazy(move || {
@@ -242,7 +248,7 @@ fn fetch_or_info_command(
 }
 
 fn eval_command(flags: DenoFlags, argv: Vec<String>) {
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+  let (mut worker, state, _inspector) = create_worker_and_state(flags, argv);
   // Wrap provided script in async function so asynchronous methods
   // work. This is required until top-level await is not supported.
   let js_source = format!(
@@ -269,7 +275,7 @@ fn eval_command(flags: DenoFlags, argv: Vec<String>) {
 
 fn xeval_command(flags: DenoFlags, argv: Vec<String>) {
   let xeval_replvar = flags.xeval_replvar.clone().unwrap();
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+  let (mut worker, state, _inspector) = create_worker_and_state(flags, argv);
   let xeval_source = format!(
     "window._xevalWrapper = async function ({}){{
         {}
@@ -291,7 +297,7 @@ fn xeval_command(flags: DenoFlags, argv: Vec<String>) {
 }
 
 fn bundle_command(flags: DenoFlags, argv: Vec<String>) {
-  let (mut _worker, state) = create_worker_and_state(flags, argv);
+  let (mut _worker, state, _inspector) = create_worker_and_state(flags, argv);
 
   let main_module = state.main_module().unwrap();
   assert!(state.argv.len() >= 3);
@@ -312,7 +318,7 @@ fn bundle_command(flags: DenoFlags, argv: Vec<String>) {
 }
 
 fn run_repl(flags: DenoFlags, argv: Vec<String>) {
-  let (mut worker, _state) = create_worker_and_state(flags, argv);
+  let (mut worker, _state, _inspector) = create_worker_and_state(flags, argv);
 
   // REPL situation.
   let main_future = lazy(move || {
@@ -328,21 +334,30 @@ fn run_repl(flags: DenoFlags, argv: Vec<String>) {
 }
 
 fn run_script(flags: DenoFlags, argv: Vec<String>) {
-  let (mut worker, state) = create_worker_and_state(flags, argv);
+  let (mut worker, state, mut inspector) = create_worker_and_state(flags, argv);
 
   let main_module = state.main_module().unwrap();
   // Normal situation of executing a module.
   let main_future = lazy(move || {
     // Setup runtime.
     js_check(worker.execute("denoMain()"));
+
+    // todo(matt): Should we start earlier so we can break inside denoMain() which is actually first line?
+    if inspector_enable {
+      inspector.start(inspector_pause);
+    }
+
     debug!("main_module {}", main_module);
 
     worker
       .execute_mod_async(&main_module, false)
       .and_then(move |()| {
         js_check(worker.execute("window.dispatchEvent(new Event('load'))"));
-        worker.then(|result| {
+        worker.then(move |result| {
           js_check(result);
+          if inspector_enable {
+            inspector.stop();
+          }
           Ok(())
         })
       }).map_err(print_err_and_exit)

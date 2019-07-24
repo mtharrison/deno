@@ -50,6 +50,8 @@ v8_source_set("libdeno") {
     "exceptions.cc",
     "exceptions.h",
     "internal.h",
+    "inspector.h",
+    "inspector.cc",
     "modules.cc",
   ]
   deps = [

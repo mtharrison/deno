@@ -2023,7 +2023,7 @@ fn op_create_worker(
   let name = format!("USER-WORKER-{}", specifier);
 
   let mut worker =
-    Worker::new(name, startup_data::deno_isolate_init(), child_state);
+    Worker::new(name, startup_data::deno_isolate_init(), child_state, None);
   worker.execute("denoMain()").unwrap();
   worker.execute("workerMain()").unwrap();
 

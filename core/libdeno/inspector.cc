@@ -71,11 +71,11 @@ InspectorClient::InspectorClient(Local<Context> context, deno::DenoIsolate* deno
 
 void InspectorClient::runMessageLoopOnPause(int context_group_id)  {
     terminated_ = false;
-    // printf("Entered loop\n");
+    printf("Entered loop\n");
     while (!terminated_) {
       deno_->inspector_block_recv_(deno_->user_data_);
     }
-    // printf("Exited loop\n");
+    printf("Exited loop\n");
   }
 
 v8_inspector::V8InspectorSession* InspectorClient::GetSession(

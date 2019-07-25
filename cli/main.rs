@@ -7,6 +7,8 @@ extern crate log;
 extern crate futures;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 extern crate clap;
 extern crate deno;
 extern crate indexmap;
@@ -14,6 +16,8 @@ extern crate indexmap;
 extern crate nix;
 extern crate rand;
 extern crate url;
+#[macro_use]
+extern crate warp;
 
 mod ansi;
 pub mod compiler;
@@ -49,7 +53,6 @@ pub mod version;
 pub mod worker;
 
 use crate::deno_dir::SourceFileFetcher;
-use crate::compiler::bundle_async;
 use crate::inspector::Inspector;
 use crate::progress::Progress;
 use crate::state::ThreadSafeState;
@@ -334,6 +337,10 @@ fn run_repl(flags: DenoFlags, argv: Vec<String>) {
 }
 
 fn run_script(flags: DenoFlags, argv: Vec<String>) {
+
+  let inspector_enable = flags.inspector_enable;
+  let inspector_pause_on_start = flags.inspector_pause_on_start;
+
   let (mut worker, state, mut inspector) = create_worker_and_state(flags, argv);
 
   let main_module = state.main_module().unwrap();
@@ -344,7 +351,7 @@ fn run_script(flags: DenoFlags, argv: Vec<String>) {
 
     // todo(matt): Should we start earlier so we can break inside denoMain() which is actually first line?
     if inspector_enable {
-      inspector.start(inspector_pause);
+      inspector.start(inspector_pause_on_start);
     }
 
     debug!("main_module {}", main_module);

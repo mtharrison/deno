@@ -149,6 +149,8 @@ void deno_mod_evaluate(Deno* d_, void* user_data, deno_mod id) {
   v8_inspector::StringView strview(reason, 14);
   session->schedulePauseOnNextStatement(strview, strview);
 
+  printf("Scheduling pause on next statement\n");
+
   if (status == Module::kInstantiated) {
     bool ok = !module->Evaluate(context).IsEmpty();
     status = module->GetStatus();  // Update status after evaluating.

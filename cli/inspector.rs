@@ -41,10 +41,10 @@ pub struct Inspector {
   // sharable handle to channels passed to isolate
   pub handle: deno::InspectorHandle,
   // sending/receving messages from isolate
-  inbound_tx: Sender<String>,
+  inbound_tx: Arc<Mutex<Sender<String>>>,
   outbound_rx: Arc<Mutex<Receiver<String>>>,
   // signals readiness of inspector
-  ready_tx: Sender<()>,
+  ready_tx: Arc<Mutex<Sender<()>>>,
   ready_rx: Arc<Mutex<Receiver<()>>>,
   server_spawn_handle: Option<SpawnHandle<(), ()>>,
   connected: Arc<Mutex<bool>>,
@@ -59,10 +59,10 @@ impl Inspector {
 
     Inspector {
       handle: deno::InspectorHandle::new(outbound_tx, inbound_rx),
-      inbound_tx,
+      inbound_tx: Arc::new(Mutex::new(inbound_tx)),
       outbound_rx: Arc::new(Mutex::new(outbound_rx)),
       ready_rx: Arc::new(Mutex::new(ready_rx)),
-      ready_tx,
+      ready_tx: Arc::new(Mutex::new(ready_tx)),
       server_spawn_handle: None,
       connected: Arc::new(Mutex::new(false)),
     }
@@ -108,7 +108,7 @@ impl Inspector {
     println!("Debugger listening on ws://{}:{}/{}", HOST, PORT, UUID);
 
     if wait {
-      self.ready_rx.recv().expect("Error waiting for inspector server to start.");
+      self.ready_rx.lock().unwrap().recv().expect("Error waiting for inspector server to start.");
       println!("Inspector frontend connected.");
     }
   }
@@ -118,9 +118,9 @@ impl Inspector {
 
 fn on_connection(
   ws: WebSocket,
-  sender: Sender<String>,
+  sender: Arc<Mutex<Sender<String>>>,
   receiver: Arc<Mutex<Receiver<String>>>,
-  ready_tx: Sender<()>,
+  ready_tx: Arc<Mutex<Sender<()>>>,
   connected: Arc<Mutex<bool>>,
 ) -> impl Future<Item = (), Error = ()> {
 
@@ -129,9 +129,8 @@ fn on_connection(
   let fut_rx = user_ws_rx
       .for_each(move |msg| {
           let msg_str = msg.to_str().unwrap();
-          // println!("FE->RUST: {}", msg_str);
-          sender.send(msg_str.to_owned()).unwrap_or_else(|err| println!("Err: {}", err));
-
+          sender.lock().unwrap().send(msg_str.to_owned()).unwrap_or_else(|err| println!("Err: {}", err));
+          // println!("FE->V8: {}", msg_str);
           Ok(())
       })
       .map_err(|_|{});
@@ -142,9 +141,11 @@ fn on_connection(
     loop {
       let received = receiver.lock().unwrap().recv();
       if let Ok(msg) = received {
-        let _ = ready_tx.send(());
+        let _ = ready_tx.lock().unwrap().send(());
         *connected.lock().unwrap() = true;
+        let clone = msg.clone();
         user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
+        // println!("V8->FE: {}", clone);
       }
     }
   });

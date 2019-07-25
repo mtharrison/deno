@@ -318,32 +318,40 @@ impl Isolate {
   }
 
   extern "C" fn inspector_message_cb(
-      user_data: *mut c_void,
-      message: *mut c_char,
-    ) {
-      let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
+    user_data: *mut c_void,
+    message: *mut c_char,
+  ) {
+    let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
 
-      if let Some(handle) = &isolate.inspector_handle {
-        let c_str = unsafe {
-          assert!(!message.is_null());
-          CStr::from_ptr(message)
-        };
+    if let Some(handle) = &isolate.inspector_handle {
+      let c_str = unsafe {
+        assert!(!message.is_null());
+        CStr::from_ptr(message)
+      };
 
-        let r_str = c_str.to_str().unwrap();
-        handle.tx.send(r_str.to_owned()).unwrap();
-      }
+      let r_str = c_str.to_str().unwrap();
+      handle.tx.lock().unwrap().send(r_str.to_owned()).unwrap();
     }
+  }
 
-    extern "C" fn inspector_block_recv(user_data: *mut c_void) {
-      let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
-      if let Some(handle) = &isolate.inspector_handle {
-        let msg = handle.rx.lock().unwrap().recv().unwrap();
-        unsafe {
-          let cstr = CString::new(msg).unwrap();
-          libdeno::deno_inspector_message(isolate.libdeno_isolate, cstr.as_ptr());
-        }
-      }
+  extern "C" fn inspector_block_recv(user_data: *mut c_void) {
+    let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
+    if let Some(handle) = &isolate.inspector_handle {
+      println!("Trying to get the lock...");
+      let recv = handle.rx.lock().unwrap();
+      println!("Got the lock...");
+      let msg = recv.recv().unwrap();
+      println!("Got the message...");
+      isolate.inspector_message(msg);
     }
+  }
+
+  pub fn inspector_message(&self, str: String) {
+    unsafe {
+      let cstr = CString::new(str).unwrap();
+      libdeno::deno_inspector_message(self.libdeno_isolate, cstr.as_ptr());
+    }
+  }
 
   #[inline]
   unsafe fn from_raw_ptr<'a>(ptr: *const c_void) -> &'a mut Self {

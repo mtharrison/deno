@@ -299,7 +299,25 @@ impl Isolate {
       return;
     };
 
-    extern "C" fn inspector_message_cb(
+    // At this point the SharedQueue should be empty.
+    assert_eq!(isolate.shared.size(), 0);
+
+    match op {
+      Op::Sync(buf) => {
+        // For sync messages, we always return the response via Deno.core.send's
+        // return value.
+        // TODO(ry) check that if JSError thrown during respond(), that it will be
+        // picked up.
+        let _ = isolate.respond(Some(&buf));
+      }
+      Op::Async(fut) => {
+        isolate.pending_ops.push(fut);
+        isolate.have_unpolled_ops = true;
+      }
+    }
+  }
+
+  extern "C" fn inspector_message_cb(
       user_data: *mut c_void,
       message: *mut c_char,
     ) {
@@ -320,27 +338,12 @@ impl Isolate {
       let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
       if let Some(handle) = &isolate.inspector_handle {
         let msg = handle.rx.recv().unwrap();
-        isolate.send_inspector(msg);
+        unsafe {
+          let cstr = CString::new(msg).unwrap();
+          libdeno::deno_inspector_message(isolate.libdeno_isolate, cstr.as_ptr());
+        }
       }
     }
-
-    // At this point the SharedQueue should be empty.
-    assert_eq!(isolate.shared.size(), 0);
-
-    match op {
-      Op::Sync(buf) => {
-        // For sync messages, we always return the response via Deno.core.send's
-        // return value.
-        // TODO(ry) check that if JSError thrown during respond(), that it will be
-        // picked up.
-        let _ = isolate.respond(Some(&buf));
-      }
-      Op::Async(fut) => {
-        isolate.pending_ops.push(fut);
-        isolate.have_unpolled_ops = true;
-      }
-    }
-  }
 
   #[inline]
   unsafe fn from_raw_ptr<'a>(ptr: *const c_void) -> &'a mut Self {

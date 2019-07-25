@@ -337,7 +337,7 @@ impl Isolate {
     extern "C" fn inspector_block_recv(user_data: *mut c_void) {
       let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
       if let Some(handle) = &isolate.inspector_handle {
-        let msg = handle.rx.recv().unwrap();
+        let msg = handle.rx.lock().unwrap().recv().unwrap();
         unsafe {
           let cstr = CString::new(msg).unwrap();
           libdeno::deno_inspector_message(isolate.libdeno_isolate, cstr.as_ptr());

@@ -1,5 +1,4 @@
 // Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
-extern crate crossbeam_channel;
 #[macro_use]
 extern crate log;
 extern crate futures;
@@ -22,7 +21,8 @@ pub use crate::libdeno::deno_mod;
 pub use crate::libdeno::PinnedBuf;
 pub use crate::module_specifier::*;
 pub use crate::modules::*;
-use crossbeam_channel::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
 
 pub fn v8_version() -> &'static str {
   use std::ffi::CStr;
@@ -36,12 +36,12 @@ pub fn v8_version() -> &'static str {
 #[derive(Clone)]
 pub struct InspectorHandle {
   pub tx: Sender<String>,
-  pub rx: Receiver<String>,
+  pub rx: Arc<Mutex<Receiver<String>>>,
 }
 
  impl InspectorHandle {
   pub fn new(tx: Sender<String>, rx: Receiver<String>) -> InspectorHandle {
-    InspectorHandle { tx, rx }
+    InspectorHandle { tx, rx: Arc::new(Mutex::new(rx)) }
   }
 }
 

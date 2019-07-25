@@ -1,8 +1,7 @@
 use futures::{Future, Stream};
 use futures::Sink;
 use futures::sync::oneshot::{SpawnHandle, spawn};
-use crossbeam_channel::{Sender, Receiver};
-use crossbeam_channel::unbounded;
+use std::sync::mpsc::{channel, Sender, Receiver};
 use warp::ws::WebSocket;
 use warp::Filter;
 use warp::ws::Message;
@@ -43,10 +42,10 @@ pub struct Inspector {
   pub handle: deno::InspectorHandle,
   // sending/receving messages from isolate
   inbound_tx: Sender<String>,
-  outbound_rx: Receiver<String>,
+  outbound_rx: Arc<Mutex<Receiver<String>>>,
   // signals readiness of inspector
   ready_tx: Sender<()>,
-  ready_rx: Receiver<()>,
+  ready_rx: Arc<Mutex<Receiver<()>>>,
   server_spawn_handle: Option<SpawnHandle<(), ()>>,
   connected: Arc<Mutex<bool>>,
 }
@@ -54,15 +53,15 @@ pub struct Inspector {
 impl Inspector {
   pub fn new() -> Self {
 
-    let (inbound_tx, inbound_rx) = unbounded::<String>();
-    let (outbound_tx, outbound_rx) = unbounded::<String>();
-    let (ready_tx, ready_rx) = unbounded::<()>();
+    let (inbound_tx, inbound_rx) = channel::<String>();
+    let (outbound_tx, outbound_rx) = channel::<String>();
+    let (ready_tx, ready_rx) = channel::<()>();
 
     Inspector {
       handle: deno::InspectorHandle::new(outbound_tx, inbound_rx),
       inbound_tx,
-      outbound_rx,
-      ready_rx,
+      outbound_rx: Arc::new(Mutex::new(outbound_rx)),
+      ready_rx: Arc::new(Mutex::new(ready_rx)),
       ready_tx,
       server_spawn_handle: None,
       connected: Arc::new(Mutex::new(false)),
@@ -120,7 +119,7 @@ impl Inspector {
 fn on_connection(
   ws: WebSocket,
   sender: Sender<String>,
-  receiver: Receiver<String>,
+  receiver: Arc<Mutex<Receiver<String>>>,
   ready_tx: Sender<()>,
   connected: Arc<Mutex<bool>>,
 ) -> impl Future<Item = (), Error = ()> {
@@ -141,7 +140,7 @@ fn on_connection(
 
   std::thread::spawn(move || {
     loop {
-      let received = receiver.recv();
+      let received = receiver.lock().unwrap().recv();
       if let Ok(msg) = received {
         let _ = ready_tx.send(());
         *connected.lock().unwrap() = true;

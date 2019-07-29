@@ -17,6 +17,10 @@
 
 static std::unique_ptr<v8::Platform> platform;
 
+namespace v8 {
+  class InspectorClient;
+}
+
 namespace deno {
 
 struct ModuleInfo {

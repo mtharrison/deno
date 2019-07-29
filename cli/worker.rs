@@ -50,7 +50,7 @@ impl Worker {
           if let Ok(msg) = rx.lock().unwrap().try_recv() {
             isolate_clone.lock().unwrap().inspector_message(msg);
           }
-          std::thread::sleep(std::time::Duration::from_millis(100));
+          std::thread::sleep(std::time::Duration::from_millis(5));
         }
       });
     }

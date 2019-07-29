@@ -109,6 +109,8 @@ impl Inspector {
 
     if wait {
       self.ready_rx.lock().unwrap().recv().expect("Error waiting for inspector server to start.");
+      // todo(matt): This is to allow v8 to ingest some inspector messages - find a more reliable way
+      std::thread::sleep(std::time::Duration::from_secs(1));
       println!("Inspector frontend connected.");
     }
   }
@@ -138,14 +140,14 @@ fn on_connection(
   // There must be a better way to do this - maybe use async channels or wrap them with a stream?
 
   std::thread::spawn(move || {
+    let receiver = receiver.lock().unwrap();
     loop {
-      let received = receiver.lock().unwrap().recv();
+      let received = receiver.recv();
       if let Ok(msg) = received {
         let _ = ready_tx.lock().unwrap().send(());
         *connected.lock().unwrap() = true;
         let clone = msg.clone();
         user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
-        // println!("V8->FE: {}", clone);
       }
     }
   });

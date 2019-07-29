@@ -149,7 +149,8 @@ void deno_execute(Deno* d_, void* user_data, const char* js_filename,
   auto* d = unwrap(d_);
   deno::UserDataScope user_data_scope(d, user_data);
 
-  // TODO(mtharrison): Find a better way to do this
+  // TODO(mtharrison): Find a better way to do this. This is here because we still need a pointer
+  // to the Rust isolate after the UserDataScope is over
   d->hack_ = user_data;
 
   auto* isolate = d->isolate_;

@@ -145,7 +145,7 @@ fn on_connection(
       Ok(())
     }).map_err(|_| {});
 
-  // TODO(mtharrison): There must be a better way to do this - maybe use async channels or wrap them with a stream?
+  // TODO(mtharrison): This is a mess. There must be a better way to do this - maybe use async channels or wrap them with a stream?
 
   std::thread::spawn(move || {
     let receiver = receiver.lock().unwrap();

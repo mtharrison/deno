@@ -72,7 +72,6 @@ class DispatchOnInspectorBackendTask : public v8::Task {
       : length_(length), message_(std::move(message)), session_(session) {}
 
   void Run() override {
-    // printf("RUST->V8\n");
     v8_inspector::StringView message_view(message_.get(), length_);
     session_->dispatchProtocolMessage(message_view);
   }

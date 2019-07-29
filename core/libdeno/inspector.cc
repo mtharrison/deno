@@ -42,7 +42,6 @@ void InspectorFrontend::Send(const v8_inspector::StringView& string) {
 
   char* cstr = &str[0u];
 
-  // printf("V8->RUST: %s\n", cstr);
   deno_->inspector_message_cb_(deno_->hack_, cstr);
 }
 
@@ -55,11 +54,6 @@ InspectorClient::InspectorClient(Local<Context> context,
   channel_.reset(fe);
   inspector_ = v8_inspector::V8Inspector::create(isolate_, this);
   session_ = inspector_->connect(1, channel_.get(), v8_inspector::StringView());
-
-  // TODO: MAke sure comms can happen
-
-  // printf("Scheduling pause on next statement\n");
-
   context->SetAlignedPointerInEmbedderData(kInspectorClientIndex, this);
   inspector_->contextCreated(v8_inspector::V8ContextInfo(
       context, kContextGroupId, v8_inspector::StringView()));
@@ -68,12 +62,11 @@ InspectorClient::InspectorClient(Local<Context> context,
 }
 
 void InspectorClient::runMessageLoopOnPause(int context_group_id) {
+  // TODO(mtharrison): Needs protection for nested loop?
   terminated_ = false;
-  printf("Entered loop\n");
   while (!terminated_) {
     deno_->inspector_block_recv_(deno_->user_data_);
   }
-  printf("Exited loop\n");
 }
 
 v8_inspector::V8InspectorSession* InspectorClient::GetSession(

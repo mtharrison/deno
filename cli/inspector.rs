@@ -146,7 +146,6 @@ fn on_connection(
       if let Ok(msg) = received {
         let _ = ready_tx.lock().unwrap().send(());
         *connected.lock().unwrap() = true;
-        let clone = msg.clone();
         user_ws_tx = user_ws_tx.send(Message::text(msg)).wait().unwrap();
       }
     }

@@ -47,9 +47,14 @@ impl Worker {
 
        std::thread::spawn(move || {
         loop {
-          if let Ok(msg) = rx.lock().unwrap().try_recv() {
-            isolate_clone.lock().unwrap().inspector_message(msg);
+          {
+            let message = { rx.lock().unwrap().try_recv() };
+
+            if let Ok(msg) = message {
+              isolate_clone.lock().unwrap().inspector_message(msg);
+            }
           }
+
           std::thread::sleep(std::time::Duration::from_millis(5));
         }
       });

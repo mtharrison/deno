@@ -4,8 +4,6 @@
 
 #include "internal.h"
 
-
-
 namespace v8 {
 
 InspectorFrontend::InspectorFrontend(Local<Context> context) {
@@ -42,16 +40,16 @@ void InspectorFrontend::Send(const v8_inspector::StringView& string) {
   String::Utf8Value utf8(isolate_, message);
   std::string str(*utf8);
 
-  char *cstr = &str[0u];
+  char* cstr = &str[0u];
 
   // printf("V8->RUST: %s\n", cstr);
   deno_->inspector_message_cb_(deno_->hack_, cstr);
 }
 
-InspectorClient::InspectorClient(Local<Context> context, deno::DenoIsolate* deno) {
-
+InspectorClient::InspectorClient(Local<Context> context,
+                                 deno::DenoIsolate* deno) {
   isolate_ = context->GetIsolate();
-  auto *fe = new InspectorFrontend(context);
+  auto* fe = new InspectorFrontend(context);
   fe->deno_ = deno;
   deno_ = deno;
   channel_.reset(fe);
@@ -69,14 +67,14 @@ InspectorClient::InspectorClient(Local<Context> context, deno::DenoIsolate* deno
   context_.Reset(isolate_, context);
 }
 
-void InspectorClient::runMessageLoopOnPause(int context_group_id)  {
-    terminated_ = false;
-    printf("Entered loop\n");
-    while (!terminated_) {
-      deno_->inspector_block_recv_(deno_->user_data_);
-    }
-    printf("Exited loop\n");
+void InspectorClient::runMessageLoopOnPause(int context_group_id) {
+  terminated_ = false;
+  printf("Entered loop\n");
+  while (!terminated_) {
+    deno_->inspector_block_recv_(deno_->user_data_);
   }
+  printf("Exited loop\n");
+}
 
 v8_inspector::V8InspectorSession* InspectorClient::GetSession(
     Local<Context> context) {

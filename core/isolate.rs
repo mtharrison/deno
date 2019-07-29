@@ -7,7 +7,6 @@
 use crate::any_error::ErrBox;
 use crate::js_errors::CoreJSError;
 use crate::js_errors::V8Exception;
-use crate::InspectorHandle;
 use crate::libdeno;
 use crate::libdeno::deno_buf;
 use crate::libdeno::deno_dyn_import_id;
@@ -18,6 +17,7 @@ use crate::libdeno::Snapshot1;
 use crate::libdeno::Snapshot2;
 use crate::shared_queue::SharedQueue;
 use crate::shared_queue::RECOMMENDED_SIZE;
+use crate::InspectorHandle;
 use futures::stream::{FuturesUnordered, Stream};
 use futures::task;
 use futures::Async::*;
@@ -145,7 +145,11 @@ static DENO_INIT: Once = Once::new();
 impl Isolate {
   /// startup_data defines the snapshot or script used at startup to initialize
   /// the isolate.
-  pub fn new(startup_data: StartupData, will_snapshot: bool, inspector_handle: Option<InspectorHandle>) -> Self {
+  pub fn new(
+    startup_data: StartupData,
+    will_snapshot: bool,
+    inspector_handle: Option<InspectorHandle>,
+  ) -> Self {
     DENO_INIT.call_once(|| {
       unsafe { libdeno::deno_init() };
     });
@@ -337,11 +341,8 @@ impl Isolate {
   extern "C" fn inspector_block_recv(user_data: *mut c_void) {
     let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
     if let Some(handle) = &isolate.inspector_handle {
-      println!("Trying to get the lock...");
       let recv = handle.rx.lock().unwrap();
-      println!("Got the lock...");
       let msg = recv.recv().unwrap();
-      println!("Got the message...");
       isolate.inspector_message(msg);
     }
   }

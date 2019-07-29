@@ -103,7 +103,8 @@ fn add_run_args<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
         .long("no-fetch")
         .help("Do not download remote modules"),
     ).arg(
-      Arg::with_name("inspect")         // todo(matt): Discuss what the ideal flags are. Also include flag for host/port binding
+      // TODO(mtharrison): Copied from Node for now - Discuss what the ideal flags are. Also include flag for host/port binding
+      Arg::with_name("inspect")
         .long("inspect")
         .help("Enable inspector"),
     ).arg(
@@ -504,7 +505,7 @@ pub fn parse_flags(
     flags = parse_run_args(flags.clone(), run_matches);
   }
 
-  // TODO (matt): Do we also need to set a v8 flag here too?
+  // TODO (matt): Do we also need to set a v8 flag here too? - Seems not required
   // TODO (matt): handle the inspector host/port flags here
   if matches.is_present("inspect") {
     flags.inspector_enable = true;

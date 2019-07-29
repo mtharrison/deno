@@ -11,8 +11,8 @@
 
 #include "deno.h"
 #include "exceptions.h"
-#include "internal.h"
 #include "inspector.h"
+#include "internal.h"
 
 extern "C" {
 
@@ -149,7 +149,7 @@ void deno_execute(Deno* d_, void* user_data, const char* js_filename,
   auto* d = unwrap(d_);
   deno::UserDataScope user_data_scope(d, user_data);
 
-  // todo(matt): Find a better way to do this
+  // TODO(mtharrison): Find a better way to do this
   d->hack_ = user_data;
 
   auto* isolate = d->isolate_;
@@ -251,14 +251,19 @@ void deno_inspector_message(Deno* d_, char* msg) {
   CHECK(!context.IsEmpty());
   v8::Context::Scope context_scope(context);
 
-  v8_inspector::V8InspectorSession* session = v8::InspectorClient::GetSession(context);
-  v8::Local<v8::String> message = v8::String::NewFromUtf8(isolate, msg).ToLocalChecked();
+  v8_inspector::V8InspectorSession* session =
+      v8::InspectorClient::GetSession(context);
+  v8::Local<v8::String> message =
+      v8::String::NewFromUtf8(isolate, msg).ToLocalChecked();
   int length = message->Length();
   std::unique_ptr<uint16_t[]> buffer(new uint16_t[length]);
   message->Write(isolate, buffer.get(), 0, length);
 
-  platform->GetForegroundTaskRunner(isolate)->PostTask(std::make_unique<v8::DispatchOnInspectorBackendTask>(session, std::move(buffer), length));
+  platform->GetForegroundTaskRunner(isolate)->PostTask(
+      std::make_unique<v8::DispatchOnInspectorBackendTask>(
+          session, std::move(buffer), length));
 
-  while(v8::platform::PumpMessageLoop(platform.get(), d->isolate_)) {}
+  while (v8::platform::PumpMessageLoop(platform.get(), d->isolate_)) {
+  }
 }
 }

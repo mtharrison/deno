@@ -5,15 +5,15 @@
 #include <memory>
 #include <string>
 
+#include "third_party/v8/include/libplatform/libplatform.h"
 #include "third_party/v8/include/v8-inspector.h"
 #include "third_party/v8/include/v8.h"
-#include "third_party/v8/include/libplatform/libplatform.h"
 #include "third_party/v8/src/base/macros.h"
 
 #include "internal.h"
 
 namespace deno {
-  class DenoIsolate;
+class DenoIsolate;
 }
 
 namespace v8 {
@@ -48,9 +48,7 @@ class InspectorClient : public v8_inspector::V8InspectorClient {
 
   void runMessageLoopOnPause(int context_group_id) override;
 
-  void quitMessageLoopOnPause() override {
-    terminated_ = true;
-  }
+  void quitMessageLoopOnPause() override { terminated_ = true; }
 
   static v8_inspector::V8InspectorSession* GetSession(Local<Context> context);
 
@@ -69,12 +67,9 @@ class InspectorClient : public v8_inspector::V8InspectorClient {
 class DispatchOnInspectorBackendTask : public v8::Task {
  public:
   explicit DispatchOnInspectorBackendTask(
-    v8_inspector::V8InspectorSession* session,
-    std::unique_ptr<uint16_t[]> message,
-    int length) :
-      length_(length),
-      message_(std::move(message)),
-      session_(session) {}
+      v8_inspector::V8InspectorSession* session,
+      std::unique_ptr<uint16_t[]> message, int length)
+      : length_(length), message_(std::move(message)), session_(session) {}
 
   void Run() override {
     // printf("RUST->V8\n");
@@ -87,8 +82,6 @@ class DispatchOnInspectorBackendTask : public v8::Task {
   std::unique_ptr<uint16_t[]> message_;
   v8_inspector::V8InspectorSession* session_;
 };
-
-
 
 }  // namespace v8
 

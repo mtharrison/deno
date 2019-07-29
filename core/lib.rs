@@ -31,7 +31,7 @@ pub fn v8_version() -> &'static str {
   c_str.to_str().unwrap()
 }
 
-// todo(matt): Move these somewhere else
+// TODO(mtharrison): Move these somewhere else
 
 #[derive(Clone)]
 pub struct InspectorHandle {
@@ -39,7 +39,7 @@ pub struct InspectorHandle {
   pub rx: Arc<Mutex<Receiver<String>>>,
 }
 
- impl InspectorHandle {
+impl InspectorHandle {
   pub fn new(tx: Sender<String>, rx: Receiver<String>) -> InspectorHandle {
     InspectorHandle {
       tx: Arc::new(Mutex::new(tx)),

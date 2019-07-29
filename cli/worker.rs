@@ -26,7 +26,11 @@ impl Worker {
     state: ThreadSafeState,
     inspector_handle: Option<deno::InspectorHandle>,
   ) -> Worker {
-    let isolate = Arc::new(Mutex::new(deno::Isolate::new(startup_data, false, inspector_handle.clone())));
+    let isolate = Arc::new(Mutex::new(deno::Isolate::new(
+      startup_data,
+      false,
+      inspector_handle.clone(),
+    )));
     {
       let mut i = isolate.lock().unwrap();
       let state_ = state.clone();
@@ -39,24 +43,22 @@ impl Worker {
       })
     }
 
-    // todo(matt): This is all wrong but I'm not sure how to structure it?
+    // TODO(mtharrison): This is all wrong but I'm not sure how to structure it?
     // perhaps this should all live inside Inspector who can call into the isolate somehow?
     if let Some(handle) = inspector_handle {
       let isolate_clone = isolate.clone();
       let rx = handle.rx.clone();
 
-       std::thread::spawn(move || {
-        loop {
-          {
-            let message = { rx.lock().unwrap().try_recv() };
+      std::thread::spawn(move || loop {
+        {
+          let message = { rx.lock().unwrap().try_recv() };
 
-            if let Ok(msg) = message {
-              isolate_clone.lock().unwrap().inspector_message(msg);
-            }
+          if let Ok(msg) = message {
+            isolate_clone.lock().unwrap().inspector_message(msg);
           }
-
-          std::thread::sleep(std::time::Duration::from_millis(5));
         }
+
+        std::thread::sleep(std::time::Duration::from_millis(5));
       });
     }
 
@@ -231,8 +233,12 @@ mod tests {
       String::from("./deno"),
       String::from("hello.js"),
     ]);
-    let mut worker =
-      Worker::new("TEST".to_string(), startup_data::deno_isolate_init(), state, None);
+    let mut worker = Worker::new(
+      "TEST".to_string(),
+      startup_data::deno_isolate_init(),
+      state,
+      None,
+    );
     worker.execute("denoMain()").unwrap();
     worker.execute("workerMain()").unwrap();
     worker

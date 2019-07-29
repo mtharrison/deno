@@ -6,9 +6,9 @@ extern crate log;
 #[macro_use]
 extern crate futures;
 #[macro_use]
-extern crate serde_json;
-#[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate serde_json;
 extern crate clap;
 extern crate deno;
 extern crate indexmap;
@@ -198,7 +198,7 @@ fn create_worker_and_state(
     }
   });
   let state = ThreadSafeState::new(flags, argv, ops::op_selector_std, progress);
-  // todo(matt): Maybe worker should own Inspector instead?
+  // TODO(mtharrison): Maybe worker should own Inspector instead?
   let inspector = Inspector::new();
   let worker = Worker::new(
     "main".to_string(),
@@ -337,7 +337,6 @@ fn run_repl(flags: DenoFlags, argv: Vec<String>) {
 }
 
 fn run_script(flags: DenoFlags, argv: Vec<String>) {
-
   let inspector_enable = flags.inspector_enable;
   let inspector_pause_on_start = flags.inspector_pause_on_start;
 
@@ -349,7 +348,7 @@ fn run_script(flags: DenoFlags, argv: Vec<String>) {
     // Setup runtime.
     js_check(worker.execute("denoMain()"));
 
-    // todo(matt): Should we start earlier so we can break inside denoMain() which is actually first line?
+    // TODO(mtharrison): Should we start earlier so we can break inside denoMain() which is actually first line?
     if inspector_enable {
       inspector.start(inspector_pause_on_start);
     }

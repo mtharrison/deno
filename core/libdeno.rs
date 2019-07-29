@@ -193,15 +193,11 @@ type deno_recv_cb = unsafe extern "C" fn(
 );
 
 #[allow(non_camel_case_types)]
-type deno_inspector_message_cb = unsafe extern "C" fn(
-  user_data: *mut c_void,
-  message: *mut c_char,
-);
+type deno_inspector_message_cb =
+  unsafe extern "C" fn(user_data: *mut c_void, message: *mut c_char);
 
- #[allow(non_camel_case_types)]
-type deno_inspector_block_recv = unsafe extern "C" fn(
-  user_data: *mut c_void,
-);
+#[allow(non_camel_case_types)]
+type deno_inspector_block_recv = unsafe extern "C" fn(user_data: *mut c_void);
 
 /// Called when dynamic import is called in JS: import('foo')
 /// Embedder must call deno_dyn_import_done() with the specified id and

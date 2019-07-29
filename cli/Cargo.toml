@@ -21,7 +21,6 @@ deno = { path = "../core" }
 ansi_term = "0.11.0"
 atty = "0.2.11"
 clap = "2.33.0"
-crossbeam-channel = "0.3"
 dirs = "2.0.1"
 flatbuffers = "0.6.0"
 futures = "0.1.27"
